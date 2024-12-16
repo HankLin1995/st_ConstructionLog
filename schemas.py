@@ -1,15 +1,85 @@
+from models import Project, ContractItem, QualityTest, Inspection
 from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
+from datetime import datetime
 
-class ItemBase(BaseModel):
+# Project Schemas
+class ProjectBase(BaseModel):
     name: str
-    description: str | None = None
-    price: float
+    contract_number: str
+    contractor: str
+    location: str
 
-class ItemCreate(ItemBase):
+class ProjectCreate(ProjectBase):
     pass
 
-class Item(ItemBase):
+class Project(ProjectBase):
     id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
     
-    # 使用新的 ConfigDict 替代舊的 Config 類
     model_config = ConfigDict(from_attributes=True)
+
+# Contract Item Schemas
+class ContractItemBase(BaseModel):
+    pcces_code: str
+    name: str
+    unit: str
+    quantity: float
+    unit_price: float
+    total_price: float
+
+class ContractItemCreate(ContractItemBase):
+    project_id: int
+
+class ContractItem(ContractItemBase):
+    id: int
+    project_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+# Test Schemas
+class TestBase(BaseModel):
+    name: str
+    test_item: str
+    test_sets: int
+    test_result: str
+
+class TestCreate(TestBase):
+    project_id: int
+    contract_item_id: int
+
+class Test(TestBase):
+    id: int
+    project_id: int
+    contract_item_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+# Inspection Schemas
+class InspectionBase(BaseModel):
+    name: str
+    inspection_time: datetime
+    location: str
+    file_path: str
+
+class InspectionCreate(InspectionBase):
+    project_id: int
+
+class Inspection(InspectionBase):
+    id: int
+    project_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+# Response Schemas with Relationships
+class ProjectWithRelations(Project):
+    contract_items: List[ContractItem] = []
+    tests: List[Test] = []
+    inspections: List[Inspection] = []

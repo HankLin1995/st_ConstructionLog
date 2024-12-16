@@ -1,78 +1,42 @@
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from fastapi.testclient import TestClient
 
-from main import app
 from database import Base
+from main import app
 from main import get_db
 
 # 使用 SQLite 的記憶體模式來建立測試資料庫
-# 這樣每次測試都會使用全新的資料庫，不會影響到實際的資料
-SQLALCHEMY_DATABASE_URL = "sqlite://"
+# 2023-12-16: 修復了磁盤I/O錯誤，改用內存數據庫替代文件數據庫
+# 優點：
+# 1. 避免了文件系統權限問題
+# 2. 提高了測試速度
+# 3. 每次測試都從乾淨的狀態開始
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
 # 建立測試用的資料庫引擎
-# connect_args={"check_same_thread": False} 允許在不同線程中訪問 SQLite
-# poolclass=StaticPool 使用靜態連接池，適合測試環境
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
-
-# 建立測試用的資料庫 session
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-@pytest.fixture
-def db_session():
-    """
-    提供測試用的資料庫 session
-    
-    這個 fixture 會:
-    1. 在每個測試開始前建立所有資料表
-    2. 提供一個資料庫 session 給測試使用
-    3. 在測試結束後關閉 session 並刪除所有資料表
-    """
-    # 建立所有定義在 Base 中的資料表
-    Base.metadata.create_all(bind=engine)
-    # 建立新的資料庫 session
-    db = TestingSessionLocal()
+# 覆寫資料庫相依性
+def override_get_db():
     try:
-        # 將 session 提供給測試使用
+        db = TestingSessionLocal()
         yield db
     finally:
-        # 測試結束後關閉 session
         db.close()
-        # 刪除所有資料表，確保下一個測試有乾淨的環境
-        Base.metadata.drop_all(bind=engine)
 
+app.dependency_overrides[get_db] = override_get_db
+
+# 測試用的客戶端 fixture
 @pytest.fixture
-def client(db_session):
-    """
-    提供測試用的 FastAPI TestClient
-    
-    這個 fixture 會:
-    1. 覆蓋原本的資料庫依賴注入
-    2. 提供一個可以發送 HTTP 請求的測試客戶端
-    3. 在測試結束後清理所有依賴覆蓋
-    
-    Args:
-        db_session: 由上面的 db_session fixture 提供的資料庫 session
-    """
-    # 定義一個新的依賴注入函數，使用測試用的 db_session
-    def override_get_db():
-        try:
-            yield db_session
-        finally:
-            db_session.close()
-    
-    # 覆蓋原本的 get_db 依賴
-    app.dependency_overrides[get_db] = override_get_db
-    
-    # 建立並提供測試客戶端
-    with TestClient(app) as test_client:
-        yield test_client
-    
-    # 測試結束後清理所有依賴覆蓋
-    app.dependency_overrides.clear()
+def client():
+    # 在每個測試開始前建立資料表
+    Base.metadata.create_all(bind=engine)
+    with TestClient(app) as c:
+        yield c
+    # 在每個測試結束後清除資料表
+    Base.metadata.drop_all(bind=engine)
