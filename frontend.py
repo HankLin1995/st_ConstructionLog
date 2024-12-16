@@ -1,30 +1,45 @@
+# 2023-12-16: 創建了 Streamlit 前端界面
+# 1. 實現了與 FastAPI 後端的完整集成
+# 2. 添加了項目、合同項目和質量測試的管理界面
+# 3. 實現了基於項目的數據過濾和關聯顯示
+
 import streamlit as st
 import requests
 import json
 import os
 from datetime import datetime
 
-# Configure the API URL from environment variable or use default
+# 從環境變量或默認值配置 API URL
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
-# Set page config
+# 設置頁面配置
 st.set_page_config(
     page_title="Quality Management System",
     page_icon="🏭",
     layout="wide"
 )
 
-# Title and description
+# 標題和描述
 st.title("Quality Management System")
 st.markdown("Manage your projects, contracts, and quality tests in one place.")
 
-# Sidebar for navigation
+# 側邊欄導航
 page = st.sidebar.selectbox(
     "Select Page",
     ["Projects", "Contract Items", "Quality Tests"]
 )
 
 def fetch_data(endpoint, project_id=None):
+    """
+    從 API 獲取數據
+    
+    Args:
+        endpoint (str): API 端點
+        project_id (int, optional): 項目 ID，用於過濾特定項目的數據
+    
+    Returns:
+        list: API 返回的數據列表
+    """
     try:
         url = f"{API_URL}/{endpoint}"
         if project_id is not None:
@@ -40,6 +55,16 @@ def fetch_data(endpoint, project_id=None):
         return []
 
 def create_data(endpoint, data):
+    """
+    創建新數據
+    
+    Args:
+        endpoint (str): API 端點
+        data (dict): 要創建的數據
+    
+    Returns:
+        dict: 創建成功返回的數據，失敗返回 None
+    """
     try:
         response = requests.post(
             f"{API_URL}/{endpoint}",
@@ -55,10 +80,11 @@ def create_data(endpoint, data):
         st.error(f"Error creating data: {str(e)}")
         return None
 
+# 項目管理頁面
 if page == "Projects":
     st.header("Projects Management")
     
-    # Create new project form
+    # 創建新項目表單
     with st.expander("Create New Project"):
         with st.form("new_project"):
             project_name = st.text_input("Project Name")
@@ -75,7 +101,7 @@ if page == "Projects":
                     "location": location
                 })
     
-    # Display projects
+    # 顯示現有項目
     st.subheader("Existing Projects")
     projects = fetch_data("projects")
     for project in projects:
@@ -86,10 +112,11 @@ if page == "Projects":
             st.write(f"Location: {project.get('location', 'N/A')}")
             st.write(f"Created at: {project.get('created_at', 'N/A')}")
 
+# 合同項目管理頁面
 elif page == "Contract Items":
     st.header("Contract Items Management")
     
-    # Create new contract item form
+    # 創建新合同項目表單
     with st.expander("Create New Contract Item"):
         projects = fetch_data("projects")
         project_choices = {p.get('name', 'Unnamed'): p.get('id') 
@@ -116,12 +143,13 @@ elif page == "Contract Items":
                     "total_price": total_price
                 })
     
-    # Select project to view its contract items
+    # 選擇項目以查看其合同項目
     selected_project = st.selectbox(
         "Select Project to View Contract Items",
         list(project_choices.keys())
     )
     
+    # 顯示選定項目的合同項目
     if selected_project:
         st.subheader(f"Contract Items for {selected_project}")
         contract_items = fetch_data("contract-items", project_choices[selected_project])
@@ -134,10 +162,11 @@ elif page == "Contract Items":
                 st.write(f"Unit Price: {item.get('unit_price', 'N/A')}")
                 st.write(f"Total Price: {item.get('total_price', 'N/A')}")
 
+# 質量測試管理頁面
 elif page == "Quality Tests":
     st.header("Quality Tests Management")
     
-    # Create new quality test form
+    # 創建新質量測試表單
     with st.expander("Create New Quality Test"):
         projects = fetch_data("projects")
         project_choices = {p.get('name', 'Unnamed'): p.get('id') 
@@ -146,6 +175,7 @@ elif page == "Quality Tests":
         with st.form("new_quality_test"):
             project = st.selectbox("Select Project", list(project_choices.keys()))
             
+            # 根據選擇的項目加載相關的合同項目
             if project:
                 contract_items = fetch_data("contract-items", project_choices[project])
                 item_choices = {
@@ -170,12 +200,13 @@ elif page == "Quality Tests":
                         "test_result": test_result
                     })
     
-    # Select project to view its quality tests
+    # 選擇項目以查看其質量測試
     selected_project = st.selectbox(
         "Select Project to View Quality Tests",
         list(project_choices.keys())
     )
     
+    # 顯示選定項目的質量測試
     if selected_project:
         st.subheader(f"Quality Tests for {selected_project}")
         quality_tests = fetch_data("tests", project_choices[selected_project])
@@ -187,6 +218,6 @@ elif page == "Quality Tests":
                 st.write(f"Test Sets: {test.get('test_sets', 'N/A')}")
                 st.write(f"Result: {test.get('test_result', 'N/A')}")
 
-# Add footer
+# 添加頁腳
 st.sidebar.markdown("---")
 st.sidebar.markdown("Made with ❤️ using Streamlit and FastAPI")
