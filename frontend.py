@@ -26,7 +26,7 @@ st.markdown("Manage your projects, contracts, and quality tests in one place.")
 # 側邊欄導航
 page = st.sidebar.selectbox(
     "Select Page",
-    ["Projects", "Contract Items", "Quality Tests"]
+    ["Projects", "Contract Items", "Quality Tests", "Inspections"]
 )
 
 def fetch_data(endpoint, project_id=None):
@@ -79,6 +79,143 @@ def create_data(endpoint, data):
     except requests.RequestException as e:
         st.error(f"Error creating data: {str(e)}")
         return None
+
+def create_inspection():
+    st.header("新增施工抽查紀錄")
+    
+    # 獲取專案列表
+    response = requests.get(f"{API_URL}/projects/")
+    if response.status_code == 200:
+        projects = response.json()
+        project_names = {f"{p['name']} ({p['contract_number']})": p['id'] for p in projects}
+        
+        selected_project = st.selectbox(
+            "選擇工程專案",
+            options=list(project_names.keys())
+        )
+        
+        if selected_project:
+            project_id = project_names[selected_project]
+            
+            with st.form("inspection_form"):
+                name = st.text_input("抽查表名稱")
+                inspection_time = st.date_input("抽查時間")
+                location = st.text_input("抽查地點")
+                uploaded_file = st.file_uploader("上傳抽查表文件", type=["pdf", "doc", "docx", "xls", "xlsx"])
+                
+                submit_button = st.form_submit_button("提交")
+                
+                if submit_button:
+                    if not all([name, inspection_time, location]):
+                        st.error("請填寫所有必要欄位")
+                        return
+                    
+                    # 創建抽查記錄
+                    inspection_data = {
+                        "project_id": project_id,
+                        "name": name,
+                        "inspection_time": inspection_time.isoformat(),
+                        "location": location,
+                        "file_path": ""  # 先創建空的文件路徑
+                    }
+                    
+                    response = requests.post(
+                        f"{API_URL}/inspections/",
+                        json=inspection_data
+                    )
+                    
+                    if response.status_code == 200:
+                        inspection = response.json()
+                        
+                        # 如果有上傳文件，處理文件上傳
+                        if uploaded_file:
+                            files = {"file": uploaded_file}
+                            upload_response = requests.post(
+                                f"{API_URL}/upload-inspection-file/",
+                                files=files,
+                                params={
+                                    "project_id": project_id,
+                                    "inspection_id": inspection["id"]
+                                }
+                            )
+                            
+                            if upload_response.status_code == 200:
+                                st.success("抽查記錄和文件上傳成功！")
+                            else:
+                                st.error(f"文件上傳失敗: {upload_response.text}")
+                        else:
+                            st.success("抽查記錄創建成功！")
+                    else:
+                        st.error(f"創建抽查記錄失敗: {response.text}")
+
+def view_inspections():
+    st.header("查看施工抽查紀錄")
+    
+    # 獲取專案列表
+    response = requests.get(f"{API_URL}/projects/")
+    if response.status_code == 200:
+        projects = response.json()
+        project_names = {f"{p['name']} ({p['contract_number']})": p['id'] for p in projects}
+        
+        selected_project = st.selectbox(
+            "選擇工程專案",
+            options=list(project_names.keys()),
+            key="view_inspections_project"
+        )
+        
+        if selected_project:
+            project_id = project_names[selected_project]
+            
+            # 獲取該專案的抽查記錄
+            response = requests.get(f"{API_URL}/projects/{project_id}/inspections")
+            if response.status_code == 200:
+                inspections = response.json()
+                
+                if not inspections:
+                    st.info("該專案尚無抽查記錄")
+                    return
+                
+                for inspection in inspections:
+                    with st.expander(f"{inspection['name']} - {inspection['inspection_time'][:10]}"):
+                        st.write(f"抽查地點: {inspection['location']}")
+                        st.write(f"建立時間: {inspection['created_at'][:19]}")
+                        
+                        if inspection.get('file_path'):
+                            try:
+                                response = requests.get(
+                                    f"{API_URL}/download-inspection-file/{inspection['id']}",
+                                    stream=True
+                                )
+                                if response.status_code == 200:
+                                    file_name = os.path.basename(inspection['file_path'])
+                                    file_extension = os.path.splitext(file_name)[1].lower()
+                                    
+                                    # 根據文件類型設置 MIME 類型
+                                    mime_types = {
+                                        '.pdf': 'application/pdf',
+                                        '.doc': 'application/msword',
+                                        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                        '.xls': 'application/vnd.ms-excel',
+                                        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                                    }
+                                    mime_type = mime_types.get(file_extension, 'application/octet-stream')
+                                    
+                                    st.download_button(
+                                        label=f"📥 下載 {file_name}",
+                                        data=response.content,
+                                        file_name=file_name,
+                                        mime=mime_type,
+                                        key=f"download_{inspection['id']}",
+                                        help="點擊下載抽查表文件"
+                                    )
+                                else:
+                                    st.error("無法獲取文件，請稍後再試")
+                            except Exception as e:
+                                st.error(f"下載出錯: {str(e)}")
+                        else:
+                            st.info("📄 尚未上傳文件")
+            else:
+                st.error(f"獲取抽查記錄失敗: {response.text}")
 
 # 項目管理頁面
 if page == "Projects":
@@ -217,6 +354,11 @@ elif page == "Quality Tests":
                 st.write(f"Test Item: {test.get('test_item', 'N/A')}")
                 st.write(f"Test Sets: {test.get('test_sets', 'N/A')}")
                 st.write(f"Result: {test.get('test_result', 'N/A')}")
+
+# 施工抽查管理頁面
+elif page == "Inspections":
+    create_inspection()
+    view_inspections()
 
 # 添加頁腳
 st.sidebar.markdown("---")

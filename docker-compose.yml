@@ -9,6 +9,7 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/app/data
+      - ./uploads:/app/uploads
     environment:
       - SQLALCHEMY_DATABASE_URL=sqlite:///./data/sql_app.db
     networks:
@@ -22,10 +23,31 @@ services:
       - "8501:8501"
     environment:
       - API_URL=http://backend:8000
+    volumes:
+      - ./uploads:/app/uploads
     depends_on:
       - backend
     networks:
       - app-network
+
+  # test:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - ./data:/app/data
+  #     - ./uploads:/app/uploads
+  #     - ./tests:/app/tests
+  #     - .:/app
+  #   environment:
+  #     - SQLALCHEMY_DATABASE_URL=sqlite:///./data/test.db
+  #     - PYTHONPATH=/app
+  #   working_dir: /app
+  #   command: pytest tests/test_file_upload.py -v --disable-warnings
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - app-network
 
 networks:
   app-network:
