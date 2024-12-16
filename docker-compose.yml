@@ -1,20 +1,32 @@
 version: '3.8'
 
 services:
-  web:
-    build: .
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
+      - ./data:/app/data
     environment:
-      - PYTHONPATH=/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      - SQLALCHEMY_DATABASE_URL=sqlite:///./data/sql_app.db
+    networks:
+      - app-network
 
-  test:
-    build: .
-    volumes:
-      - .:/app
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    ports:
+      - "8501:8501"
     environment:
-      - PYTHONPATH=/app
-    command: pytest -v
+      - API_URL=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

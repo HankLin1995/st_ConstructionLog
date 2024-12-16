@@ -13,4 +13,6 @@ RUN mkdir -p /app/data && \
 
 ENV SQLALCHEMY_DATABASE_URL="sqlite:///./data/sql_app.db"
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
