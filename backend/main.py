@@ -72,17 +72,59 @@ def read_project(project_id: int, db: Session = Depends(get_db)):
 @app.post("/contract-items/", response_model=schemas.ContractItem, tags=["contract items"])
 def create_contract_item(item: schemas.ContractItemCreate, db: Session = Depends(get_db)):
     """創建新的契約項目"""
+    # 驗證 project_id 是否存在
+    project = db.query(Project).filter(Project.id == item.project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project with id {item.project_id} not found")
+        
     db_item = ContractItem(**item.model_dump())
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
     return db_item
 
+@app.get("/contract-items/", response_model=List[schemas.ContractItem], tags=["contract items"])
+def read_contract_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """獲取所有契約項目列表"""
+    items = db.query(ContractItem).offset(skip).limit(limit).all()
+    return items
+
 @app.get("/projects/{project_id}/contract-items/", response_model=List[schemas.ContractItem], tags=["contract items"])
-def read_contract_items(project_id: int, db: Session = Depends(get_db)):
+def read_project_contract_items(project_id: int, db: Session = Depends(get_db)):
     """獲取特定工程專案的契約項目列表"""
+    # 驗證 project_id 是否存在
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail=f"Project with id {project_id} not found")
+        
     items = db.query(ContractItem).filter(ContractItem.project_id == project_id).all()
     return items
+
+@app.put("/contract-items/{item_id}", response_model=schemas.ContractItem, tags=["contract items"])
+def update_contract_item(item_id: int, item: schemas.ContractItemUpdate, db: Session = Depends(get_db)):
+    """更新契約項目"""
+    db_item = db.query(ContractItem).filter(ContractItem.id == item_id).first()
+    if db_item is None:
+        raise HTTPException(status_code=404, detail="Contract item not found")
+    
+    # 只更新提供的字段
+    for field, value in item.model_dump(exclude_unset=True).items():
+        setattr(db_item, field, value)
+    
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@app.delete("/contract-items/{item_id}", tags=["contract items"])
+def delete_contract_item(item_id: int, db: Session = Depends(get_db)):
+    """刪除契約項目"""
+    db_item = db.query(ContractItem).filter(ContractItem.id == item_id).first()
+    if db_item is None:
+        raise HTTPException(status_code=404, detail="Contract item not found")
+        
+    db.delete(db_item)
+    db.commit()
+    return {"message": "Contract item deleted successfully"}
 
 # Test endpoints
 @app.post("/tests/", response_model=schemas.Test, tags=["tests"])

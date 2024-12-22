@@ -1,15 +1,12 @@
-version: '3.8'
-
 services:
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ./backend
     ports:
       - "8000:8000"
     volumes:
       - ./data:/app/data
-      - ./uploads:/app/uploads
+      - ./data/uploads:/app/uploads
     environment:
       - SQLALCHEMY_DATABASE_URL=sqlite:///./data/sql_app.db
     networks:
@@ -17,37 +14,22 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: Dockerfile.streamlit
+      context: ./frontend
     ports:
       - "8501:8501"
     environment:
       - API_URL=http://backend:8000
     volumes:
-      - ./uploads:/app/uploads
+      - ./data:/app/data:ro
+      - ./data/uploads:/app/uploads:ro
     depends_on:
       - backend
     networks:
       - app-network
 
-  # test:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   volumes:
-  #     - ./data:/app/data
-  #     - ./uploads:/app/uploads
-  #     - ./tests:/app/tests
-  #     - .:/app
-  #   environment:
-  #     - SQLALCHEMY_DATABASE_URL=sqlite:///./data/test.db
-  #     - PYTHONPATH=/app
-  #   working_dir: /app
-  #   command: pytest tests/test_file_upload.py -v --disable-warnings
-  #   depends_on:
-  #     - backend
-  #   networks:
-  #     - app-network
+volumes:
+  backend_data:
+  shared_uploads:
 
 networks:
   app-network:

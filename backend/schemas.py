@@ -1,5 +1,5 @@
 from models import Project, ContractItem, QualityTest, Inspection
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 from datetime import datetime
 
@@ -31,6 +31,14 @@ class ContractItemBase(BaseModel):
 
 class ContractItemCreate(ContractItemBase):
     project_id: int
+
+class ContractItemUpdate(BaseModel):
+    pcces_code: Optional[str] = None
+    name: Optional[str] = None
+    unit: Optional[str] = None
+    quantity: Optional[float] = Field(gt=0, default=None)
+    unit_price: Optional[float] = Field(ge=0, default=None)
+    total_price: Optional[float] = Field(ge=0, default=None)
 
 class ContractItem(ContractItemBase):
     id: int
