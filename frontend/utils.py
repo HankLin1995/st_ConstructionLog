@@ -21,6 +21,21 @@ def fetch_data(endpoint, project_id=None):
     except requests.RequestException as e:
         st.error(f"獲取數據失敗：{str(e)}")
         return []
+    
+def fetch_data_by_id(endpoint, id):
+    """從 API 獲取數據"""
+    try:
+        url = f"{API_URL}/{endpoint}/{id}"
+        st.toast(url)
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"獲取數據失敗：{response.text}")
+            return []
+    except requests.RequestException as e:
+        st.error(f"獲取數據失敗：{str(e)}")
+        return []
 
 def create_data(endpoint, data):
     """創建新數據"""
@@ -39,3 +54,34 @@ def create_data(endpoint, data):
     except requests.RequestException as e:
         st.error(f"創建數據失敗：{str(e)}")
         return None
+    
+def update_data(endpoint, id, data):
+    """更新數據"""
+    try:
+        response = requests.put(
+            f"{API_URL}/{endpoint}/{id}",
+            json=data
+        )
+        if response.status_code == 200:
+            st.success("更新成功！")
+            return response.json()
+        else:
+            st.error(f"更新失敗：{response.text}")
+            return None
+    except requests.RequestException as e:
+        st.error(f"更新失數據失敗：{str(e)}")
+        return None
+
+def delete_data(endpoint, id):
+    """刪除數據"""
+    try:
+        response = requests.delete(f"{API_URL}/{endpoint}/{id}")
+        if response.status_code == 200:
+            # st.success("刪除成功！")
+            return True
+        else:
+            # st.error(f"刪除失敗：{response.text}")
+            return False
+    except requests.RequestException as e:
+        # st.error(f"刪除失敗：{str(e)}")
+        return False

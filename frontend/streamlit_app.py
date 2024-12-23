@@ -12,6 +12,11 @@ st.set_page_config(
     layout="wide"
 )
 
+## session state
+
+if "project_id" not in st.session_state:
+    st.session_state.project_id = None
+
 # 標題和描述
 st.title("工程品質管理系統")
 st.markdown("統一管理您的工程專案、合約項目和品質測試")

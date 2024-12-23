@@ -13,6 +13,12 @@ class ProjectBase(BaseModel):
 class ProjectCreate(ProjectBase):
     pass
 
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    contract_number: Optional[str] = None
+    contractor: Optional[str] = None
+    location: Optional[str] = None
+
 class Project(ProjectBase):
     id: int
     created_at: datetime
@@ -87,7 +93,7 @@ class Inspection(InspectionBase):
     model_config = ConfigDict(from_attributes=True)
 
 # Response Schemas with Relationships
-class ProjectWithRelations(Project):
-    contract_items: List[ContractItem] = []
-    tests: List[Test] = []
-    inspections: List[Inspection] = []
+# class ProjectWithRelations(Project):
+#     contract_items: List[ContractItem] = []
+#     tests: List[Test] = []
+#     inspections: List[Inspection] = []

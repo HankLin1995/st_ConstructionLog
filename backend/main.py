@@ -60,13 +60,47 @@ def read_projects(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     projects = db.query(Project).offset(skip).limit(limit).all()
     return projects
 
-@app.get("/projects/{project_id}", response_model=schemas.ProjectWithRelations, tags=["projects"])
+@app.get("/projects/{project_id}", response_model=schemas.ProjectBase, tags=["projects"])
 def read_project(project_id: int, db: Session = Depends(get_db)):
     """獲取特定工程專案的詳細信息，包括關聯數據"""
     project = db.query(Project).filter(Project.id == project_id).first()
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+@app.put("/projects/{project_id}", response_model=schemas.Project, tags=["projects"])
+def update_project(project_id: int, project_update: schemas.ProjectUpdate, db: Session = Depends(get_db)):
+    """更新工程專案"""
+    db_project = db.query(Project).filter(Project.id == project_id).first()
+    if db_project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    update_data = project_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_project, field, value)
+    
+    db_project.updated_at = datetime.now()
+    db.commit()
+    db.refresh(db_project)
+    return db_project
+
+@app.delete("/projects/{project_id}", tags=["projects"])
+def delete_project(project_id: int, db: Session = Depends(get_db)):
+    """刪除工程專案"""
+    db_project = db.query(Project).filter(Project.id == project_id).first()
+    if db_project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # 刪除相關的契約項目
+    db.query(ContractItem).filter(ContractItem.project_id == project_id).delete()
+    # 刪除相關的品質試驗
+    db.query(QualityTest).filter(QualityTest.project_id == project_id).delete()
+    # 刪除相關的施工抽查
+    db.query(Inspection).filter(Inspection.project_id == project_id).delete()
+    
+    db.delete(db_project)
+    db.commit()
+    return {"message": "Project deleted successfully"}
 
 # Contract Item endpoints
 @app.post("/contract-items/", response_model=schemas.ContractItem, tags=["contract items"])
