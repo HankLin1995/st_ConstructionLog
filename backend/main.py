@@ -201,8 +201,19 @@ def read_project_inspections(project_id: int, db: Session = Depends(get_db)):
     inspections = db.query(Inspection).filter(Inspection.project_id == project_id).all()
     return inspections
 
-# File handling endpoints
-@app.post("/upload-inspection-file/", tags=["files"])
+@app.delete("/inspections/{inspection_id}", tags=["inspections"])
+def delete_inspection(inspection_id: int, db: Session = Depends(get_db)):
+    """刪除施工抽查記錄"""
+    db_inspection = db.query(Inspection).filter(Inspection.id == inspection_id).first()
+    if db_inspection is None:
+        raise HTTPException(status_code=404, detail="Inspection not found")
+    
+    db.delete(db_inspection)
+    db.commit()
+    return {"message": "Inspection deleted successfully"}
+
+# File handling endpoints (RESTful)
+@app.post("/inspection-files/", tags=["files"])
 async def upload_inspection_file(
     file: UploadFile = File(...),
     project_id: int = Form(...),
@@ -257,7 +268,8 @@ async def upload_inspection_file(
             detail=f"文件上傳失敗: {str(e)}"
         )
 
-@app.get("/download-inspection-file/{inspection_id}", tags=["files"])
+
+@app.get("/inspection-files/{inspection_id}", tags=["files"])
 async def download_inspection_file(inspection_id: int, db: Session = Depends(get_db)):
     """下載施工抽查相關文件"""
     inspection = db.query(Inspection).filter(Inspection.id == inspection_id).first()
@@ -279,6 +291,27 @@ async def download_inspection_file(inspection_id: int, db: Session = Depends(get
         filename=file_path.name,
         media_type="application/octet-stream"
     )
+
+
+@app.delete("/inspection-files/{inspection_id}", tags=["files"])
+def delete_inspection_file(inspection_id: int, db: Session = Depends(get_db)):
+    """刪除施工抽查相關文件"""
+    inspection = db.query(Inspection).filter(Inspection.id == inspection_id).first()
+    if not inspection or not inspection.file_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="找不到指定的文件"
+        )
+    
+    file_path = Path(inspection.file_path)
+    if file_path.exists():
+        file_path.unlink()
+    
+    # 清空數據庫中的文件路徑
+    inspection.file_path = None
+    db.commit()
+    
+    return {"message": "文件刪除成功"}
 
 ## 2024-12-29: 新增 Photo endpoints
 

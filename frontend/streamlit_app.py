@@ -15,7 +15,7 @@ st.set_page_config(
 ## session state
 
 if "project_id" not in st.session_state:
-    st.session_state.project_id = None
+    st.session_state.project_id = 1
 
 # 標題和描述
 # st.title("工程品質管理系統")

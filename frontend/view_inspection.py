@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import pandas as pd
 import utils
+import time
 
 @st.dialog("新增抽查表")
 def create_inspection_UI():
@@ -48,7 +49,7 @@ def create_inspection_UI():
                     "inspection_id": inspection_id
                 }
                 upload_response = utils.upload_file(
-                    "upload-inspection-file",
+                    "inspection-files",
                     files,
                     data
                 )
@@ -61,8 +62,9 @@ def create_inspection_UI():
                 # 清理臨時文件
                 os.unlink(tmp_file_path)
 
-
-
+                time.sleep(1) 
+                st.rerun()
+            
 project_id = st.session_state.project_id
 
 if project_id is None:
@@ -79,20 +81,53 @@ inspections = utils.fetch_data("inspections", project_id)
 
 df= pd.DataFrame(inspections)
 
-df_show=df[['name','inspection_time','location','updated_at']]
-df_show.columns=['抽查表名稱','抽查日期','抽查地點','更新日期']
-
 if inspections:
     st.subheader("抽查表清單")
-    st.dataframe(df_show,hide_index=True,use_container_width=True)
+    df_show=df[['id','name','inspection_time','location','updated_at']]
+    df_show.columns=['編號','抽查表名稱','抽查日期','抽查地點','更新日期']
+    # st.dataframe(df_show,hide_index=True,use_container_width=True)
+
+    event=st.dataframe(df_show,
+                        hide_index=True,
+                        use_container_width=True,
+                        on_select="rerun",
+                        selection_mode="multi-row"
+    )
+
+    # 檢查是否有選擇專案
+    if event :
+        inspec_data = event.selection.rows  # 選擇的行索引列表
+
+        selected_rows_df = df.iloc[inspec_data]
+        # 顯示選擇的所有行
+        # st.write("選擇的抽查表資料：")
+        # st.dataframe(selected_rows_df,hide_index=True)  # 顯示合併後的 DataFrame
+
+        if st.sidebar.button("刪除抽查表"):
+
+            for index, row in selected_rows_df.iterrows():
+                utils.delete_data("inspection-files",row['id'])
+                utils.delete_data("inspections",row['id'])
+
+            time.sleep(1)
+            st.rerun()
+
+        if st.sidebar.button("下載抽查表"):
+            for index, row in selected_rows_df.iterrows():
+                response = utils.download_file("inspection-files", row['id'])
+                if response:
+                    # 提供下載連結
+                    st.download_button(
+                        "點擊下載",
+                        response,
+                        f"inspection_{row['id']}.pdf",
+                        "application/pdf"
+                    )
+
 else:
     st.info("尚無抽查表")
 
-# 新增抽查表
-
-st.markdown("---")
-
-if st.button("新增抽查表"):
+if st.sidebar.button("新增抽查表"):
     create_inspection_UI()
 
 

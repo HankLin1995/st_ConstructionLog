@@ -79,7 +79,7 @@ class InspectionBase(BaseModel):
     name: str
     inspection_time: datetime
     location: str
-    file_path: str
+    file_path: Optional[str] = None
     is_pass: bool
 
 class InspectionCreate(InspectionBase):

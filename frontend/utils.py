@@ -100,3 +100,16 @@ def upload_file(endpoint, files, data):
     except requests.RequestException as e:
         st.error(f"文件上傳失敗：{str(e)}")
         return None
+    
+def download_file(endpoint,id):
+    """下載文件"""
+    try:
+        response = requests.get(f"{API_URL}/{endpoint}/{id}")
+        if response.status_code == 200:
+            return response.content
+        else:
+            st.error(f"文件下載失敗：{response.text}")
+            return None
+    except requests.RequestException as e:
+        st.error(f"文件下載失敗：{str(e)}")
+        return None
