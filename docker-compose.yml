@@ -27,6 +27,17 @@ services:
     networks:
       - app-network
 
+  # test:
+  #   build:
+  #     context: .
+  #     dockerfile: tests/Dockerfile.test
+  #   volumes:
+  #     - .:/app
+  #   environment:
+  #     - SQLALCHEMY_DATABASE_URL=sqlite:///./test.db
+  #   networks:
+  #     - app-network
+
 volumes:
   backend_data:
   shared_uploads:

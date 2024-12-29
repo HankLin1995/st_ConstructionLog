@@ -85,3 +85,18 @@ def delete_data(endpoint, id):
     except requests.RequestException as e:
         # st.error(f"刪除失敗：{str(e)}")
         return False
+    
+def upload_file(endpoint, files, data):
+    """上傳文件"""
+
+    try:
+        response = requests.post(f"{API_URL}/{endpoint}", files=files, data=data)
+        st.write(f"{API_URL}/{endpoint}")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"文件上傳失敗：{response.text}")
+            return None
+    except requests.RequestException as e:
+        st.error(f"文件上傳失敗：{str(e)}")
+        return None

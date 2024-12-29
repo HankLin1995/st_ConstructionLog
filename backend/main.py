@@ -3,11 +3,11 @@
 # 2. 將 dict() 方法更新為 model_dump() 以符合 Pydantic v2 的要求
 # 3. 更新了所有使用 Test 類的地方為 QualityTest
 
-from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
+from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File,Form
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine, init_db
-from models import Project, ContractItem, QualityTest, Inspection
+from models import Project, ContractItem, QualityTest, Inspection, Photo
 import schemas
 from typing import List
 import logging
@@ -205,11 +205,12 @@ def read_project_inspections(project_id: int, db: Session = Depends(get_db)):
 @app.post("/upload-inspection-file/", tags=["files"])
 async def upload_inspection_file(
     file: UploadFile = File(...),
-    project_id: int = None,
-    inspection_id: int = None,
+    project_id: int = Form(...),
+    inspection_id: int = Form(...),
     db: Session = Depends(get_db)
 ):
     """上傳施工抽查相關文件"""
+    print(f"project_id: {project_id}, inspection_id: {inspection_id}")
     try:
         # 驗證文件類型
         file_extension = Path(file.filename).suffix.lower()
@@ -278,3 +279,58 @@ async def download_inspection_file(inspection_id: int, db: Session = Depends(get
         filename=file_path.name,
         media_type="application/octet-stream"
     )
+
+## 2024-12-29: 新增 Photo endpoints
+
+@app.post("/photos/", response_model=schemas.Photo, tags=["photos"])
+def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
+    """創建新的圖片"""
+    db_photo = Photo(**photo.model_dump())
+    db.add(db_photo)
+    db.commit()
+    db.refresh(db_photo)
+    return db_photo
+
+@app.put("/photos/{photo_id}", response_model=schemas.Photo, tags=["photos"])
+def update_photo(photo_id: int, photo: schemas.PhotoUpdate, db: Session = Depends(get_db)):
+    """更新圖片"""
+    db_photo = db.query(Photo).filter(Photo.id == photo_id).first()
+    if db_photo is None:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    update_data = photo.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_photo, field, value)
+    
+    db.commit()
+    db.refresh(db_photo)
+    return db_photo
+
+@app.get("/projects/{project_id}/photos/", response_model=List[schemas.Photo], tags=["photos"])
+def read_project_photos(project_id: int, db: Session = Depends(get_db)):
+    """獲取特定工程專案的圖片列表"""
+    photos = db.query(Photo).filter(Photo.project_id == project_id).all()
+    return photos
+
+# @app.get("/inspections/{inspection_id}/photos/", response_model=List[schemas.Photo], tags=["photos"])
+# def read_inspection_photos(inspection_id: int, db: Session = Depends(get_db)):
+#     """獲取特定施工抽查的圖片列表"""
+#     photos = db.query(Photo).filter(Photo.inspection_id == inspection_id).all()
+#     return photos
+
+# @app.get("/quality-tests/{test_id}/photos/", response_model=List[schemas.Photo], tags=["photos"])
+# def read_test_photos(test_id: int, db: Session = Depends(get_db)):
+#     """獲取特定品質試驗的圖片列表"""
+#     photos = db.query(Photo).filter(Photo.quality_test_id == test_id).all()
+#     return photos
+
+@app.delete("/photos/{photo_id}", tags=["photos"])
+def delete_photo(photo_id: int, db: Session = Depends(get_db)):
+    """刪除圖片"""
+    db_photo = db.query(Photo).filter(Photo.id == photo_id).first()
+    if db_photo is None:
+        raise HTTPException(status_code=404, detail="Photo not found")
+        
+    db.delete(db_photo)
+    db.commit()
+    return {"message": "Photo deleted successfully"}

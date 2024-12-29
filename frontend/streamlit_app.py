@@ -18,15 +18,17 @@ if "project_id" not in st.session_state:
     st.session_state.project_id = None
 
 # 標題和描述
-st.title("工程品質管理系統")
-st.markdown("統一管理您的工程專案、合約項目和品質測試")
+# st.title("工程品質管理系統")
+# st.markdown("統一管理您的工程專案、合約項目和品質測試")
 
 v_projects = st.Page("view_projects.py", title="工程專案", icon=":material/contract:")
 v_items=st.Page("view_items.py", title="合約項目", icon=":material/contract:")
+v_inspections=st.Page("view_inspection.py", title="施工抽查", icon=":material/contract:")
+# v_tests=st.Page("view_tests.py", title="品質測試", icon=":material/contract:")
 
 pg=st.navigation(
     {
-        "專案管理": [v_projects,v_items],
+        "專案管理": [v_projects,v_items,v_inspections],
     }
 )
 

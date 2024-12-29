@@ -25,6 +25,7 @@ class Project(Base):
     contract_items = relationship("ContractItem", back_populates="project")
     tests = relationship("QualityTest", back_populates="project")
     inspections = relationship("Inspection", back_populates="project")
+    photos = relationship("Photo", back_populates="project")
 
 class ContractItem(Base):
     """契約項目模型"""
@@ -44,6 +45,7 @@ class ContractItem(Base):
     # Relationships
     project = relationship("Project", back_populates="contract_items")
     tests = relationship("QualityTest", back_populates="contract_item")
+    # photos = relationship("Photo", back_populates="contract_item")
 
 class QualityTest(Base):
     """品質試驗紀錄模型
@@ -65,6 +67,7 @@ class QualityTest(Base):
     # Relationships
     project = relationship("Project", back_populates="tests")
     contract_item = relationship("ContractItem", back_populates="tests")
+    photos = relationship("Photo", back_populates="quality_test")
 
 class Inspection(Base):
     """施工抽查紀錄模型"""
@@ -76,8 +79,31 @@ class Inspection(Base):
     inspection_time = Column(DateTime, comment="抽查時間")
     location = Column(String, comment="抽查地點")
     file_path = Column(String, comment="電子檔路徑")
+    is_pass=Column(String, comment="是否合格")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     project = relationship("Project", back_populates="inspections")
+    photos = relationship("Photo", back_populates="inspection")
+
+class Photo(Base):
+    """圖片模型"""
+    __tablename__ = "photos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"))
+    inspection_id = Column(Integer, ForeignKey("inspections.id"), nullable=True)
+    quality_test_id = Column(Integer, ForeignKey("tests.id"), nullable=True)
+    # contract_item_id = Column(Integer, ForeignKey("contract_items.id"), nullable=True)
+    filename = Column(String, comment="檔案名稱")
+    file_path = Column(String, comment="圖片路徑")
+    description = Column(String, nullable=True, comment="圖片描述")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    project = relationship("Project", back_populates="photos")
+    inspection = relationship("Inspection", back_populates="photos")
+    quality_test = relationship("QualityTest", back_populates="photos")
+    # contract_item = relationship("ContractItem", back_populates="photos")

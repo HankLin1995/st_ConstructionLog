@@ -80,6 +80,7 @@ class InspectionBase(BaseModel):
     inspection_time: datetime
     location: str
     file_path: str
+    is_pass: bool
 
 class InspectionCreate(InspectionBase):
     project_id: int
@@ -92,8 +93,27 @@ class Inspection(InspectionBase):
     
     model_config = ConfigDict(from_attributes=True)
 
-# Response Schemas with Relationships
-# class ProjectWithRelations(Project):
-#     contract_items: List[ContractItem] = []
-#     tests: List[Test] = []
-#     inspections: List[Inspection] = []
+# Photo Schemas
+class PhotoBase(BaseModel):
+    filename: str
+    file_path: str
+    description: Optional[str] = None
+
+class PhotoCreate(PhotoBase):
+    project_id: int
+    quality_test_id: Optional[int] = None
+    inspection_id: Optional[int] = None
+
+class PhotoUpdate(BaseModel):
+    filename: Optional[str] = None
+    description: Optional[str] = None
+
+class Photo(PhotoBase):
+    id: int
+    project_id: int
+    quality_test_id: Optional[int] = None
+    inspection_id: Optional[int] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)
