@@ -3,17 +3,18 @@
 # 2. 將 dict() 方法更新為 model_dump() 以符合 Pydantic v2 的要求
 # 3. 更新了所有使用 Test 類的地方為 QualityTest
 
-from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File,Form
+from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine, init_db
 from models import Project, ContractItem, QualityTest, Inspection, Photo
 import schemas
-from typing import List
+from typing import List, Optional
 import logging
 from datetime import datetime
 import os
 from pathlib import Path
+import io
 
 # 配置日誌
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +30,16 @@ app = FastAPI(
 # 設定文件上傳目錄
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)  # 確保目錄存在
+
+async def process_uploaded_photo(file: UploadFile, save_path: Path) -> str:
+    """處理上傳的照片：保存文件"""
+    contents = await file.read()
+    
+    # 保存原始文件
+    with open(save_path, "wb") as f:
+        f.write(contents)
+    
+    return str(save_path)
 
 # 允許的文件類型
 ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx", ".xls", ".xlsx"}
@@ -315,14 +326,136 @@ def delete_inspection_file(inspection_id: int, db: Session = Depends(get_db)):
 
 ## 2024-12-29: 新增 Photo endpoints
 
-@app.post("/photos/", response_model=schemas.Photo, tags=["photos"])
-def create_photo(photo: schemas.PhotoCreate, db: Session = Depends(get_db)):
-    """創建新的圖片"""
-    db_photo = Photo(**photo.model_dump())
+@app.post("/photos/upload/", response_model=schemas.Photo, tags=["photos"])
+async def upload_photo(
+    file: UploadFile = File(...),
+    project_id: int = Form(...),
+    quality_test_id: Optional[str] = Form(None),  
+    inspection_id: Optional[int] = Form(None),
+    description: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """上傳單張照片並關聯到專案、品質試驗或施工抽查"""
+    
+    # 驗證檔案類型
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(
+            status_code=400,
+            detail="只允許上傳圖片檔案"
+        )
+    
+    # 處理 quality_test_id
+    quality_test_id_int = None
+    if quality_test_id and quality_test_id.strip():
+        try:
+            quality_test_id_int = int(quality_test_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="quality_test_id 必須是有效的整數"
+            )
+    
+    # 建立照片儲存目錄
+    photos_dir = UPLOAD_DIR / "photos"
+    photos_dir.mkdir(exist_ok=True)
+    
+    # 生成唯一的檔案名稱
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    new_filename = f"{timestamp}_{file.filename}"
+    file_path = photos_dir / new_filename
+    
+    # 處理照片
+    file_path_str = await process_uploaded_photo(file, file_path)
+    
+    # 建立照片記錄
+    photo_data = {
+        "project_id": project_id,
+        "quality_test_id": quality_test_id_int,
+        "inspection_id": inspection_id,
+        "filename": new_filename,
+        "file_path": file_path_str,
+        "description": description
+    }
+    
+    db_photo = Photo(**photo_data)
     db.add(db_photo)
     db.commit()
     db.refresh(db_photo)
+    
     return db_photo
+
+@app.post("/photos/bulk-upload/", response_model=List[schemas.Photo], tags=["photos"])
+async def bulk_upload_photos(
+    files: List[UploadFile] = File(...),
+    project_id: int = Form(...),
+    quality_test_id: Optional[str] = Form(None),  
+    inspection_id: Optional[int] = Form(None),
+    description: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """批量上傳多張照片"""
+    
+    # 處理 quality_test_id
+    quality_test_id_int = None
+    if quality_test_id and quality_test_id.strip():
+        try:
+            quality_test_id_int = int(quality_test_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="quality_test_id 必須是有效的整數"
+            )
+    
+    photos_dir = UPLOAD_DIR / "photos"
+    photos_dir.mkdir(exist_ok=True)
+    
+    uploaded_photos = []
+    
+    for file in files:
+        # 驗證檔案類型
+        if not file.content_type.startswith('image/'):
+            continue
+        
+        # 生成唯一的檔案名稱
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        new_filename = f"{timestamp}_{file.filename}"
+        file_path = photos_dir / new_filename
+        
+        # 處理照片
+        file_path_str = await process_uploaded_photo(file, file_path)
+        
+        # 建立照片記錄
+        photo_data = {
+            "project_id": project_id,
+            "quality_test_id": quality_test_id_int,
+            "inspection_id": inspection_id,
+            "filename": new_filename,
+            "file_path": file_path_str,
+            "description": description
+        }
+        
+        db_photo = Photo(**photo_data)
+        db.add(db_photo)
+        uploaded_photos.append(db_photo)
+    
+    db.commit()
+    for photo in uploaded_photos:
+        db.refresh(photo)
+    
+    return uploaded_photos
+
+@app.get("/photos/{photo_id}/view", response_class=FileResponse, tags=["photos"])
+async def view_photo(photo_id: int, db: Session = Depends(get_db)):
+    """查看特定照片"""
+    photo = db.query(Photo).filter(Photo.id == photo_id).first()
+    if photo is None:
+        raise HTTPException(status_code=404, detail="照片不存在")
+    
+    file_path = Path(photo.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="照片檔案不存在")
+    
+    return FileResponse(file_path)
 
 @app.put("/photos/{photo_id}", response_model=schemas.Photo, tags=["photos"])
 def update_photo(photo_id: int, photo: schemas.PhotoUpdate, db: Session = Depends(get_db)):
@@ -345,17 +478,23 @@ def read_project_photos(project_id: int, db: Session = Depends(get_db)):
     photos = db.query(Photo).filter(Photo.project_id == project_id).all()
     return photos
 
-# @app.get("/inspections/{inspection_id}/photos/", response_model=List[schemas.Photo], tags=["photos"])
-# def read_inspection_photos(inspection_id: int, db: Session = Depends(get_db)):
-#     """獲取特定施工抽查的圖片列表"""
-#     photos = db.query(Photo).filter(Photo.inspection_id == inspection_id).all()
-#     return photos
-
-# @app.get("/quality-tests/{test_id}/photos/", response_model=List[schemas.Photo], tags=["photos"])
-# def read_test_photos(test_id: int, db: Session = Depends(get_db)):
-#     """獲取特定品質試驗的圖片列表"""
-#     photos = db.query(Photo).filter(Photo.quality_test_id == test_id).all()
-#     return photos
+@app.get("/inspections/{inspection_id}/photos", response_model=List[schemas.Photo], tags=["photos"])
+async def get_inspection_photos(
+    inspection_id: int,
+    db: Session = Depends(get_db)
+):
+    """獲取特定施工抽查表下的所有照片"""
+    # 檢查施工抽查表是否存在
+    inspection = db.query(Inspection).filter(Inspection.id == inspection_id).first()
+    if inspection is None:
+        raise HTTPException(
+            status_code=404,
+            detail="施工抽查表不存在"
+        )
+    
+    # 獲取該施工抽查表下的所有照片
+    photos = db.query(Photo).filter(Photo.inspection_id == inspection_id).all()
+    return photos
 
 @app.delete("/photos/{photo_id}", tags=["photos"])
 def delete_photo(photo_id: int, db: Session = Depends(get_db)):

@@ -95,7 +95,6 @@ class Photo(Base):
     project_id = Column(Integer, ForeignKey("projects.id"))
     inspection_id = Column(Integer, ForeignKey("inspections.id"), nullable=True)
     quality_test_id = Column(Integer, ForeignKey("tests.id"), nullable=True)
-    # contract_item_id = Column(Integer, ForeignKey("contract_items.id"), nullable=True)
     filename = Column(String, comment="檔案名稱")
     file_path = Column(String, comment="圖片路徑")
     description = Column(String, nullable=True, comment="圖片描述")

@@ -5,6 +5,7 @@ pydantic
 python-dotenv
 python-multipart
 alembic
+Pillow
 
 # # Testing dependencies
 # pytest==7.4.3

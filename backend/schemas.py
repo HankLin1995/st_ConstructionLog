@@ -99,10 +99,13 @@ class PhotoBase(BaseModel):
     file_path: str
     description: Optional[str] = None
 
-class PhotoCreate(PhotoBase):
+class PhotoCreate(BaseModel):
     project_id: int
     quality_test_id: Optional[int] = None
     inspection_id: Optional[int] = None
+    filename: str
+    file_path: str
+    description: Optional[str] = None
 
 class PhotoUpdate(BaseModel):
     filename: Optional[str] = None
